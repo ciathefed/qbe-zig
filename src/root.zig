@@ -639,7 +639,12 @@ pub const Function = struct {
         }
 
         var args = std.ArrayList([]const u8).init(self.allocator);
-        defer args.deinit();
+        defer {
+            for (args.items) |arg| {
+                self.allocator.free(arg);
+            }
+            args.deinit();
+        }
 
         for (self.arguments) |arg| {
             const arg_string = try std.fmt.allocPrint(self.allocator, "{} {}", .{ arg.ty, arg.val });
