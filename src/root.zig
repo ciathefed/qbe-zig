@@ -68,9 +68,9 @@ pub const Instr = union(enum) {
     /// Performs a comparion between values
     cmp: Compare,
     /// Performs a bitwise AND on values
-    and_op: BinaryOp,
+    @"and": BinaryOp,
     /// Performs a bitwise OR on values
-    or_op: BinaryOp,
+    @"or": BinaryOp,
     /// Copies either a temporary or a literal value
     copy: Value,
     /// Return from a function, optionally with a value
@@ -190,8 +190,8 @@ pub const Instr = union(enum) {
                 }
                 try writer.print("c{s}{} {}, {}", .{ i.cmp.toString(), i.ty, i.lhs, i.rhs });
             },
-            .and_op => |i| try writer.print("and {}, {}", .{ i.lhs, i.rhs }),
-            .or_op => |i| try writer.print("or {}, {}", .{ i.lhs, i.rhs }),
+            .@"and" => |i| try writer.print("and {}, {}", .{ i.lhs, i.rhs }),
+            .@"or" => |i| try writer.print("or {}, {}", .{ i.lhs, i.rhs }),
             .copy => |i| try writer.print("copy {}", .{i}),
             .ret => |i| {
                 if (i) |val| {
