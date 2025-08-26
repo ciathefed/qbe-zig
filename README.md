@@ -15,14 +15,23 @@ Run this command in the root of your Zig project:
 zig fetch --save "git+https://github.com/ciathefed/qbe-zig"
 ```
 
-Add this snippet to your `build.zig`:
+Add `qbe-zig` to your imports in `build.zig`:
 
 ```zig
 const qbe = b.dependency("qbe", .{
     .target = target,
     .optimize = optimize,
 });
-exe_mod.addImport("qbe", qbe.module("qbe"));
+
+const exe = b.addExecutable(.{
+    // ...
+    .root_module = b.createModule(.{
+        // ...
+        .imports = &.{
+            .{ .name = "qbe", .module = qbe.module("qbe") },
+        },
+    }),
+});
 ```
 
 ## API Reference
