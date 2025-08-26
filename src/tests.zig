@@ -15,7 +15,7 @@ const Statement = @import("root.zig").Statement;
 const DataItem = @import("root.zig").DataItem;
 
 fn testFmtEquals(T: type, value: T, expected: []const u8) !void {
-    const string = try std.fmt.allocPrint(testing.allocator, "{}", .{value});
+    const string = try std.fmt.allocPrint(testing.allocator, "{f}", .{value});
     defer testing.allocator.free(string);
     try testing.expectEqualSlices(u8, expected, string);
 }
@@ -197,7 +197,7 @@ test "module fmt order" {
     });
     _ = try module.addData(data);
 
-    const formatted = try std.fmt.allocPrint(testing.allocator, "{}", .{module});
+    const formatted = try std.fmt.allocPrint(testing.allocator, "{f}", .{module});
     defer testing.allocator.free(formatted);
 
     const type_pos = std.mem.indexOf(u8, formatted, ":test_type") orelse {
