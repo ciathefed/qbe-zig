@@ -11,8 +11,16 @@ This library allows you to build QBE IR in pure Zig, suitable for backends, comp
 
 Run this command in the root of your Zig project:
 
+### Latest Release (recommended)
+
 ```shell
-zig fetch --save "git+https://github.com/ciathefed/qbe-zig"
+zig fetch --save "git+https://github.com/ciathefed/qbe-zig#v0.1.1"
+````
+
+### Latest on `main` (bleeding edge)
+
+```shell
+zig fetch --save "git+https://github.com/ciathefed/qbe-zig#main"
 ```
 
 Add `qbe-zig` to your imports in `build.zig`:
