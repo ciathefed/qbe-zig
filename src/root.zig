@@ -1,6 +1,6 @@
 const std = @import("std");
 const print = std.debug.print;
-const ArrayList = std.ArrayList;
+const ArrayList = std.array_list.Managed;
 const Allocator = std.mem.Allocator;
 
 pub const Argument = struct {
@@ -171,31 +171,27 @@ pub const Instr = union(enum) {
     pub const Phi = struct { label1: []const u8, val1: Value, label2: []const u8, val2: Value };
 
     pub fn format(
-        self: Instr,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        _ = fmt;
-        _ = options;
+        self: @This(),
+        writer: *std.Io.Writer,
+    ) std.Io.Writer.Error!void {
         switch (self) {
-            .add => |i| try writer.print("add {}, {}", .{ i.lhs, i.rhs }),
-            .sub => |i| try writer.print("sub {}, {}", .{ i.lhs, i.rhs }),
-            .mul => |i| try writer.print("mul {}, {}", .{ i.lhs, i.rhs }),
-            .div => |i| try writer.print("div {}, {}", .{ i.lhs, i.rhs }),
-            .rem => |i| try writer.print("rem {}, {}", .{ i.lhs, i.rhs }),
+            .add => |i| try writer.print("add {f}, {f}", .{ i.lhs, i.rhs }),
+            .sub => |i| try writer.print("sub {f}, {f}", .{ i.lhs, i.rhs }),
+            .mul => |i| try writer.print("mul {f}, {f}", .{ i.lhs, i.rhs }),
+            .div => |i| try writer.print("div {f}, {f}", .{ i.lhs, i.rhs }),
+            .rem => |i| try writer.print("rem {f}, {f}", .{ i.lhs, i.rhs }),
             .cmp => |i| {
                 if (i.ty == .aggregate) {
                     @panic("Cannot compare aggregate types");
                 }
-                try writer.print("c{s}{} {}, {}", .{ i.cmp.toString(), i.ty, i.lhs, i.rhs });
+                try writer.print("c{s}{f} {f}, {f}", .{ i.cmp.toString(), i.ty, i.lhs, i.rhs });
             },
-            .@"and" => |i| try writer.print("and {}, {}", .{ i.lhs, i.rhs }),
-            .@"or" => |i| try writer.print("or {}, {}", .{ i.lhs, i.rhs }),
-            .copy => |i| try writer.print("copy {}", .{i}),
+            .@"and" => |i| try writer.print("and {f}, {f}", .{ i.lhs, i.rhs }),
+            .@"or" => |i| try writer.print("or {f}, {f}", .{ i.lhs, i.rhs }),
+            .copy => |i| try writer.print("copy {f}", .{i}),
             .ret => |i| {
                 if (i) |val| {
-                    try writer.print("ret {}", .{val});
+                    try writer.print("ret {f}", .{val});
                 } else {
                     try writer.writeAll("ret");
                 }
@@ -203,12 +199,12 @@ pub const Instr = union(enum) {
             .dbg_file => |i| try writer.print("dbgfile \"{s}\"", .{i}),
             .dbg_loc => |i| {
                 if (i.column) |col| {
-                    try writer.print("dbgloc {}, {}", .{ i.line, col });
+                    try writer.print("dbgloc {d}, {d}", .{ i.line, col });
                 } else {
-                    try writer.print("dbgloc {}", .{i.line});
+                    try writer.print("dbgloc {d}", .{i.line});
                 }
             },
-            .jnz => |i| try writer.print("jnz {}, @{s}, @{s}", .{ i.cond, i.non_zero, i.zero }),
+            .jnz => |i| try writer.print("jnz {f}, @{s}, @{s}", .{ i.cond, i.non_zero, i.zero }),
             .jmp => |i| try writer.print("jmp @{s}", .{i}),
             .call => |i| {
                 try writer.print("call ${s}(", .{i.name});
@@ -219,51 +215,51 @@ pub const Instr = union(enum) {
                             try writer.writeAll("..., ");
                         }
                     }
-                    try writer.print("{} {}", .{ arg.ty, arg.val });
+                    try writer.print("{f} {f}", .{ arg.ty, arg.val });
                 }
                 try writer.writeAll(")");
             },
-            .alloc4 => |i| try writer.print("alloc4 {}", .{i}),
-            .alloc8 => |i| try writer.print("alloc8 {}", .{i}),
-            .alloc16 => |i| try writer.print("alloc16 {}", .{i}),
+            .alloc4 => |i| try writer.print("alloc4 {d}", .{i}),
+            .alloc8 => |i| try writer.print("alloc8 {d}", .{i}),
+            .alloc16 => |i| try writer.print("alloc16 {d}", .{i}),
             .store => |i| {
                 if (i.ty == .aggregate) {
                     @panic("Store to an aggregate type not implemented");
                 }
-                try writer.print("store{} {}, {}", .{ i.ty, i.src, i.dest });
+                try writer.print("store{f} {f}, {f}", .{ i.ty, i.src, i.dest });
             },
             .load => |i| {
                 if (i.ty == .aggregate) {
                     @panic("Load aggregate type not implemented");
                 }
-                try writer.print("load{} {}", .{ i.ty, i.src });
+                try writer.print("load{f} {f}", .{ i.ty, i.src });
             },
-            .blit => |i| try writer.print("blit {}, {}, {}", .{ i.src, i.dest, i.n }),
-            .udiv => |i| try writer.print("udiv {}, {}", .{ i.lhs, i.rhs }),
-            .urem => |i| try writer.print("urem {}, {}", .{ i.lhs, i.rhs }),
-            .sar => |i| try writer.print("sar {}, {}", .{ i.lhs, i.rhs }),
-            .shr => |i| try writer.print("shr {}, {}", .{ i.lhs, i.rhs }),
-            .shl => |i| try writer.print("shl {}, {}", .{ i.lhs, i.rhs }),
-            .cast => |i| try writer.print("cast {}", .{i}),
-            .extsw => |i| try writer.print("extsw {}", .{i}),
-            .extuw => |i| try writer.print("extuw {}", .{i}),
-            .extsh => |i| try writer.print("extsh {}", .{i}),
-            .extuh => |i| try writer.print("extuh {}", .{i}),
-            .extsb => |i| try writer.print("extsb {}", .{i}),
-            .extub => |i| try writer.print("extub {}", .{i}),
-            .exts => |i| try writer.print("exts {}", .{i}),
-            .truncd => |i| try writer.print("truncd {}", .{i}),
-            .stosi => |i| try writer.print("stosi {}", .{i}),
-            .stoui => |i| try writer.print("stoui {}", .{i}),
-            .dtosi => |i| try writer.print("dtosi {}", .{i}),
-            .dtoui => |i| try writer.print("dtoui {}", .{i}),
-            .swtof => |i| try writer.print("swtof {}", .{i}),
-            .uwtof => |i| try writer.print("uwtof {}", .{i}),
-            .sltof => |i| try writer.print("sltof {}", .{i}),
-            .ultof => |i| try writer.print("ultof {}", .{i}),
-            .vastart => |i| try writer.print("vastart {}", .{i}),
-            .vaarg => |i| try writer.print("vaarg{} {}", .{ i.ty, i.val }),
-            .phi => |i| try writer.print("phi @{s} {}, @{s} {}", .{ i.label1, i.val1, i.label2, i.val2 }),
+            .blit => |i| try writer.print("blit {f}, {f}, {d}", .{ i.src, i.dest, i.n }),
+            .udiv => |i| try writer.print("udiv {f}, {f}", .{ i.lhs, i.rhs }),
+            .urem => |i| try writer.print("urem {f}, {f}", .{ i.lhs, i.rhs }),
+            .sar => |i| try writer.print("sar {f}, {f}", .{ i.lhs, i.rhs }),
+            .shr => |i| try writer.print("shr {f}, {f}", .{ i.lhs, i.rhs }),
+            .shl => |i| try writer.print("shl {f}, {f}", .{ i.lhs, i.rhs }),
+            .cast => |i| try writer.print("cast {f}", .{i}),
+            .extsw => |i| try writer.print("extsw {f}", .{i}),
+            .extuw => |i| try writer.print("extuw {f}", .{i}),
+            .extsh => |i| try writer.print("extsh {f}", .{i}),
+            .extuh => |i| try writer.print("extuh {f}", .{i}),
+            .extsb => |i| try writer.print("extsb {f}", .{i}),
+            .extub => |i| try writer.print("extub {f}", .{i}),
+            .exts => |i| try writer.print("exts {f}", .{i}),
+            .truncd => |i| try writer.print("truncd {f}", .{i}),
+            .stosi => |i| try writer.print("stosi {f}", .{i}),
+            .stoui => |i| try writer.print("stoui {f}", .{i}),
+            .dtosi => |i| try writer.print("dtosi {f}", .{i}),
+            .dtoui => |i| try writer.print("dtoui {f}", .{i}),
+            .swtof => |i| try writer.print("swtof {f}", .{i}),
+            .uwtof => |i| try writer.print("uwtof {f}", .{i}),
+            .sltof => |i| try writer.print("sltof {f}", .{i}),
+            .ultof => |i| try writer.print("ultof {f}", .{i}),
+            .vastart => |i| try writer.print("vastart {f}", .{i}),
+            .vaarg => |i| try writer.print("vaarg{f} {f}", .{ i.ty, i.val }),
+            .phi => |i| try writer.print("phi @{s} {f}, @{s} {f}", .{ i.label1, i.val1, i.label2, i.val2 }),
             .hlt => try writer.writeAll("hlt"),
         }
     }
@@ -355,13 +351,9 @@ pub const Type = union(enum) {
     }
 
     pub fn format(
-        self: Type,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        _ = fmt;
-        _ = options;
+        self: @This(),
+        writer: *std.Io.Writer,
+    ) std.Io.Writer.Error!void {
         switch (self) {
             .byte => try writer.writeAll("b"),
             .signed_byte => try writer.writeAll("sb"),
@@ -389,17 +381,13 @@ pub const Value = union(enum) {
     @"const": u64,
 
     pub fn format(
-        self: Value,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        _ = fmt;
-        _ = options;
+        self: @This(),
+        writer: *std.Io.Writer,
+    ) std.Io.Writer.Error!void {
         switch (self) {
             .temporary => |name| try writer.print("%{s}", .{name}),
             .global => |name| try writer.print("${s}", .{name}),
-            .@"const" => |val| try writer.print("{}", .{val}),
+            .@"const" => |val| try writer.print("{d}", .{val}),
         }
     }
 };
@@ -431,23 +419,19 @@ pub const DataDef = struct {
     }
 
     pub fn format(
-        self: DataDef,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        _ = fmt;
-        _ = options;
-        try writer.print("{}data ${s} = ", .{ self.linkage, self.name });
+        self: @This(),
+        writer: *std.Io.Writer,
+    ) std.Io.Writer.Error!void {
+        try writer.print("{f}data ${s} = ", .{ self.linkage, self.name });
 
         if (self.@"align") |@"align"| {
-            try writer.print("align {} ", .{@"align"});
+            try writer.print("align {d} ", .{@"align"});
         }
 
         try writer.writeAll("{ ");
         for (self.items, 0..) |item, i| {
             if (i > 0) try writer.writeAll(", ");
-            try writer.print("{} {}", .{ item.ty, item.item });
+            try writer.print("{f} {f}", .{ item.ty, item.item });
         }
         try writer.writeAll(" }");
     }
@@ -470,24 +454,20 @@ pub const DataItem = union(enum) {
     };
 
     pub fn format(
-        self: DataItem,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        _ = fmt;
-        _ = options;
+        self: @This(),
+        writer: *std.Io.Writer,
+    ) std.Io.Writer.Error!void {
         switch (self) {
             .symbol => |s| {
                 if (s.offset) |off| {
-                    try writer.print("${s} +{}", .{ s.name, off });
+                    try writer.print("${s} +{d}", .{ s.name, off });
                 } else {
                     try writer.print("${s}", .{s.name});
                 }
             },
             .str => |s| try writer.print("\"{s}\"", .{s}),
-            .@"const" => |val| try writer.print("{}", .{val}),
-            .zero => |size| try writer.print("z {}", .{size}),
+            .@"const" => |val| try writer.print("{d}", .{val}),
+            .zero => |size| try writer.print("z {d}", .{size}),
         }
     }
 };
@@ -512,25 +492,21 @@ pub const TypeDef = struct {
     }
 
     pub fn format(
-        self: TypeDef,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        _ = fmt;
-        _ = options;
+        self: @This(),
+        writer: *std.Io.Writer,
+    ) std.Io.Writer.Error!void {
         try writer.print("type :{s} = ", .{self.name});
         if (self.@"align") |@"align"| {
-            try writer.print("align {} ", .{@"align"});
+            try writer.print("align {d} ", .{@"align"});
         }
 
         try writer.writeAll("{ ");
         for (self.items, 0..) |item, i| {
             if (i > 0) try writer.writeAll(", ");
             if (item.repeat > 1) {
-                try writer.print("{} {}", .{ item.ty, item.repeat });
+                try writer.print("{f} {d}", .{ item.ty, item.repeat });
             } else {
-                try writer.print("{}", .{item.ty});
+                try writer.print("{f}", .{item.ty});
             }
         }
         try writer.writeAll(" }");
@@ -549,21 +525,17 @@ pub const Statement = union(enum) {
     };
 
     pub fn format(
-        self: Statement,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        _ = fmt;
-        _ = options;
+        self: @This(),
+        writer: *std.Io.Writer,
+    ) std.Io.Writer.Error!void {
         switch (self) {
             .assign => |s| {
                 if (s.temp != .temporary) {
                     @panic("Assignment target must be a temporary");
                 }
-                try writer.print("{} ={} {}", .{ s.temp, s.ty, s.instr });
+                try writer.print("{f} ={f} {f}", .{ s.temp, s.ty, s.instr });
             },
-            .@"volatile" => |s| try writer.print("{}", .{s}),
+            .@"volatile" => |s| try writer.print("{f}", .{s}),
         }
     }
 };
@@ -622,16 +594,12 @@ pub const Block = struct {
     }
 
     pub fn format(
-        self: Block,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        _ = fmt;
-        _ = options;
+        self: @This(),
+        writer: *std.Io.Writer,
+    ) std.Io.Writer.Error!void {
         try writer.print("@{s}\n", .{self.label});
         for (self.items.items) |item| {
-            try writer.print("\t{}\n", .{item});
+            try writer.print("\t{f}\n", .{item});
         }
     }
 };
@@ -642,15 +610,11 @@ pub const BlockItem = union(enum) {
     comment: []const u8,
 
     pub fn format(
-        self: BlockItem,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        _ = fmt;
-        _ = options;
+        self: @This(),
+        writer: *std.Io.Writer,
+    ) std.Io.Writer.Error!void {
         switch (self) {
-            .statement => |stmt| try writer.print("{}", .{stmt}),
+            .statement => |stmt| try writer.print("{f}", .{stmt}),
             .comment => |comment| try writer.print("# {s}", .{comment}),
         }
     }
@@ -725,20 +689,15 @@ pub const Function = struct {
     }
 
     pub fn format(
-        self: Function,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        _ = fmt;
-        _ = options;
-
-        try writer.print("{}function", .{self.linkage});
+        self: @This(),
+        writer: *std.Io.Writer,
+    ) std.Io.Writer.Error!void {
+        try writer.print("{f}function", .{self.linkage});
         if (self.return_ty) |ty| {
-            try writer.print(" {}", .{ty});
+            try writer.print(" {f}", .{ty});
         }
 
-        var args = std.ArrayList([]const u8).init(self.allocator);
+        var args = ArrayList([]const u8).init(self.allocator);
         defer {
             for (args.items) |arg| {
                 self.allocator.free(arg);
@@ -747,16 +706,22 @@ pub const Function = struct {
         }
 
         for (self.arguments) |arg| {
-            const arg_string = try std.fmt.allocPrint(self.allocator, "{} {}", .{ arg.ty, arg.val });
-            try args.append(arg_string);
+            const arg_string = std.fmt.allocPrint(self.allocator, "{f} {f}", .{ arg.ty, arg.val }) catch {
+                return std.Io.Writer.Error.WriteFailed;
+            };
+            args.append(arg_string) catch {
+                return std.Io.Writer.Error.WriteFailed;
+            };
         }
 
-        const args_string = try std.mem.join(self.allocator, ", ", args.items);
+        const args_string = std.mem.join(self.allocator, ", ", args.items) catch {
+            return std.Io.Writer.Error.WriteFailed;
+        };
         defer self.allocator.free(args_string);
 
         try writer.print(" ${s}({s}) {{\n", .{ self.name, args_string });
         for (self.blocks.items) |blk| {
-            try writer.print("{}", .{blk});
+            try writer.print("{f}", .{blk});
         }
         try writer.print("}}", .{});
     }
@@ -810,13 +775,9 @@ pub const Linkage = struct {
     }
 
     pub fn format(
-        self: Linkage,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        _ = fmt;
-        _ = options;
+        self: @This(),
+        writer: *std.Io.Writer,
+    ) std.Io.Writer.Error!void {
         if (self.exported) {
             try writer.writeAll("export ");
         }
@@ -878,24 +839,19 @@ pub const Module = struct {
     }
 
     pub fn format(
-        self: Module,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        _ = fmt;
-        _ = options;
-
+        self: @This(),
+        writer: *std.Io.Writer,
+    ) std.Io.Writer.Error!void {
         for (self.types.items) |ty| {
-            try writer.print("{s}\n", .{ty});
+            try writer.print("{f}\n", .{ty});
         }
 
         for (self.functions.items) |func| {
-            try writer.print("{s}\n", .{func});
+            try writer.print("{f}\n", .{func});
         }
 
         for (self.data.items) |data| {
-            try writer.print("{s}\n", .{data});
+            try writer.print("{f}\n", .{data});
         }
     }
 };
