@@ -30,16 +30,7 @@ const qbe = b.dependency("qbe", .{
     .target = target,
     .optimize = optimize,
 });
-
-const exe = b.addExecutable(.{
-    // ...
-    .root_module = b.createModule(.{
-        // ...
-        .imports = &.{
-            .{ .name = "qbe", .module = qbe.module("qbe") },
-        },
-    }),
-});
+exe.root_module.addImport("qbe", qbe.module("qbe"));
 ```
 
 ## API Reference
